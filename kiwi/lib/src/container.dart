@@ -4,8 +4,7 @@ typedef T Factory<T>(Container container);
 /// A simple service container.
 class Container {
   /// Creates a scoped container.
-  Container.scoped()
-      : _namedProviders = Map<String, Map<Type, _Provider<Object>>>();
+  Container.scoped() : _namedProviders = Map<String, Map<Type, _Provider<Object>>>();
 
   static final Container _instance = new Container.scoped();
 
@@ -72,8 +71,7 @@ class Container {
   ///
   /// If [name] is set, removes the one registered for that name.
   void unregister<T>([String name]) {
-    assert(silent || (_namedProviders[name]?.containsKey(T) ?? false),
-        _assertRegisterMessage<T>('not', name));
+    assert(silent || (_namedProviders[name]?.containsKey(T) ?? false), _assertRegisterMessage<T>('not', name));
     _namedProviders[name]?.remove(T);
   }
 
@@ -89,8 +87,7 @@ class Container {
   T resolve<T>([String name]) {
     Map<Type, _Provider<Object>> providers = _namedProviders[name];
 
-    assert(silent || (providers?.containsKey(T) ?? false),
-        _assertRegisterMessage<T>('not', name));
+    assert(silent || (providers?.containsKey(T) ?? false), _assertRegisterMessage<T>('not', name));
     if (providers == null) {
       return null;
     }
@@ -109,13 +106,11 @@ class Container {
 
   void _setProvider<T>(String name, _Provider<T> provider) {
     assert(
-        silent ||
-            (!_namedProviders.containsKey(name) ||
-                !_namedProviders[name].containsKey(T)),
-        _assertRegisterMessage<T>('already', name),);
+      silent || (!_namedProviders.containsKey(name) || !_namedProviders[name].containsKey(T)),
+      _assertRegisterMessage<T>('already', name),
+    );
 
-    _namedProviders.putIfAbsent(name, () => Map<Type, _Provider<Object>>())[T] =
-        provider;
+    _namedProviders.putIfAbsent(name, () => Map<Type, _Provider<Object>>())[T] = provider;
   }
 
   String _assertRegisterMessage<T>(String word, String name) {
