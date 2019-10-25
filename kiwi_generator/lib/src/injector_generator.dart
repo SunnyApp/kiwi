@@ -82,10 +82,10 @@ class InjectorGenerator extends Generator {
     final String typeParameters = concrete == null ? '' : '<${type.name}, $className>';
 
     final Map<String, String> namedArguments = {};
-    if (name != null) namedArguments["name"] = name;
+    if (name != null) namedArguments["name"] = "\"$name\"";
     if (eagerInit == true) namedArguments["eagerInit"] = "true";
     final nameArgument =
-        namedArguments.isEmpty ? "" : "${namedArguments.entries.map((e) => ", ${e.key}: \"${e.value}\"").join("")}";
+        namedArguments.isEmpty ? "" : "${namedArguments.entries.map((e) => ", ${e.key}: ${e.value}").join("")}";
 
     final String constructorName = registerObject.getField('constructorName').toStringValue();
     final String constructorNameArgument = constructorName == null ? '' : '.$constructorName';
