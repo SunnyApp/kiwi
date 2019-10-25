@@ -9,6 +9,7 @@ class Register {
     this.resolvers,
     this.constructorName,
   })  : assert(type != null),
+        eagerInit = false,
         oneTime = null;
 
   /// Create an annotation that will generate a `registerSingleton` method.
@@ -17,6 +18,7 @@ class Register {
     this.name,
     this.from,
     this.resolvers,
+    this.eagerInit,
     this.constructorName,
   })  : assert(type != null),
         oneTime = true;
@@ -26,6 +28,9 @@ class Register {
 
   /// The type to create when requesting [type].
   final Type from;
+
+  /// Whether this instance should be eagerly instantiated
+  final bool eagerInit;
 
   /// The name under which the factory will be registered
   ///

@@ -1,3 +1,5 @@
+import 'package:kiwi/kiwi.dart';
+
 /// Signature for a builder which creates an object of type [T].
 typedef T Factory<T>(Container container);
 
@@ -12,6 +14,10 @@ class Container {
   factory Container() => _instance;
 
   final Map<String, Map<Type, _Provider<Object>>> _namedProviders;
+
+  /// Whether this container has been initialized - which occurs when the first instance has been
+  /// requested
+  bool _initialized = false;
 
   /// Whether ignoring assertion errors in the following cases:
   /// * if you register the same type under the same name a second time.
@@ -63,6 +69,7 @@ class Container {
   void registerSingleton<S, T extends S>(
     Factory<S> factory, {
     String name,
+    bool eagerInit = false,
   }) {
     _setProvider(name, _Provider<S>.singleton(factory));
   }
@@ -72,7 +79,14 @@ class Container {
   /// If [name] is set, removes the one registered for that name.
   void unregister<T>([String name]) {
     assert(silent || (_namedProviders[name]?.containsKey(T) ?? false), _assertRegisterMessage<T>('not', name));
-    _namedProviders[name]?.remove(T);
+    final provider = _namedProviders[name];
+    if (provider != null) {
+      final instance = provider[T];
+      if (instance is LifecycleAware) {
+        (instance as LifecycleAware).unregister();
+      }
+      provider.remove(T);
+    }
   }
 
   /// Attemps to resolve the type [T].
@@ -85,6 +99,16 @@ class Container {
   ///  * [Container.registerFactory] for register a builder function.
   ///  * [Container.registerInstance] for register an instance.
   T resolve<T>([String name]) {
+    if (_initialized != true) {
+      _namedProviders.values.forEach((_) {
+        _.values.forEach((provider) {
+          if (provider.eagerInit && provider.object == null) {
+            provider.get(this);
+          }
+        });
+      });
+      _initialized = true;
+    }
     Map<Type, _Provider<Object>> providers = _namedProviders[name];
 
     assert(silent || (providers?.containsKey(T) ?? false), _assertRegisterMessage<T>('not', name));
@@ -100,7 +124,15 @@ class Container {
   /// Removes all instances and builders from the container.
   ///
   /// After this, the container is empty.
-  void clear() {
+  Future clear() async {
+    for (final instances in _namedProviders.values) {
+      for (final instance in instances.values) {
+        if (instance.object is LifecycleAware) {
+          await (instance.object as LifecycleAware).unregister();
+        }
+      }
+    }
+
     _namedProviders.clear();
   }
 
@@ -121,15 +153,21 @@ class Container {
 class _Provider<T> {
   _Provider.instance(this.object)
       : instanceBuilder = null,
+        eagerInit = false,
         _oneTime = false;
 
-  _Provider.factory(this.instanceBuilder) : _oneTime = false;
+  _Provider.factory(this.instanceBuilder)
+      : eagerInit = false,
+        _oneTime = false;
 
-  _Provider.singleton(this.instanceBuilder) : _oneTime = true;
+  _Provider.singleton(this.instanceBuilder, {this.eagerInit}) : _oneTime = true;
 
   final Factory<T> instanceBuilder;
   T object;
   bool _oneTime = false;
+
+  /// Only applies to singletons
+  final bool eagerInit;
 
   T get(Container container) {
     if (_oneTime && instanceBuilder != null) {
@@ -147,4 +185,8 @@ class _Provider<T> {
 
     return null;
   }
+}
+
+abstract class LifecycleAware {
+  unregister();
 }
