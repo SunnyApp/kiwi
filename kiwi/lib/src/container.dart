@@ -102,7 +102,7 @@ class Container {
     if (_initialized != true) {
       _namedProviders.values.forEach((_) {
         _.values.forEach((provider) {
-          if (provider.eagerInit && provider.object == null) {
+          if (provider.eagerInit == true && provider.object == null) {
             provider.get(this);
           }
         });
@@ -160,7 +160,7 @@ class _Provider<T> {
       : eagerInit = false,
         _oneTime = false;
 
-  _Provider.singleton(this.instanceBuilder, {this.eagerInit}) : _oneTime = true;
+  _Provider.singleton(this.instanceBuilder, {this.eagerInit = false}) : _oneTime = true;
 
   final Factory<T> instanceBuilder;
   T object;
