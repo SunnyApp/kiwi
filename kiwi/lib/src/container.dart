@@ -71,7 +71,7 @@ class Container {
     String name,
     bool eagerInit = false,
   }) {
-    _setProvider(name, _Provider<S>.singleton(factory));
+    _setProvider(name, _Provider<S>.singleton(factory, eagerInit: eagerInit));
   }
 
   /// Removes the entry previously registered for the type [T].
