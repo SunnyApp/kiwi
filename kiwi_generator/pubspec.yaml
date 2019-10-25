@@ -8,20 +8,33 @@ environment:
   sdk: '>=2.2.0 <3.0.0'
 
 dependencies:  
-  analyzer: <0.39.0
-  build: ">=1.0.0 <1.2.0"
-  build_config: <0.4.0
-  code_builder: ^3.2.0
-  dart_style: ^1.2.9
+  analyzer: any
+  build: any
+  build_config: any
+  code_builder: any
+  dart_style: any
   kiwi:
     git:
       url: https://github.com/SunnyApp/kiwi.git
       ref: master
       path: kiwi
-  path: ^1.6.4
-  source_gen: ^0.9.2
+  path: any
+  source_gen: any
+
+  # analyzer: <0.39.0
+  # build: ">=1.0.0 <1.2.0"
+  # build_config: ^0.4.1+1
+  # code_builder: ^3.2.0
+  # dart_style: ^1.2.9
+  # kiwi:
+  #   git:
+  #     url: https://github.com/SunnyApp/kiwi.git
+  #     ref: master
+  #     path: kiwi
+  # path: ^1.6.4
+  # source_gen: ^0.9.2
 
 dev_dependencies:
-  build_runner: <1.7.1
-  build_test: ^0.10.0
-  test: ^1.9.3
+  build_runner: any
+  build_test: any
+  test: any
