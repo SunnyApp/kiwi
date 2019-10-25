@@ -10,12 +10,10 @@ import 'package:dart_style/dart_style.dart';
 
 import 'package:kiwi/kiwi.dart';
 
-const TypeChecker _registerTypeChecker =
-    const TypeChecker.fromRuntime(Register);
+const TypeChecker _registerTypeChecker = const TypeChecker.fromRuntime(Register);
 
 bool _isRegisterMethod(MethodElement method) =>
-    method.returnType.isVoid &&
-    _registerTypeChecker.hasAnnotationOfExact(method);
+    method.returnType.isVoid && _registerTypeChecker.hasAnnotationOfExact(method);
 
 class InjectorGenerator extends Generator {
   const InjectorGenerator();
@@ -28,25 +26,20 @@ class InjectorGenerator extends Generator {
         .where((c) =>
             c.isAbstract &&
             c.methods.where((m) => m.isAbstract).isNotEmpty &&
-            c.methods
-                .where((m) => m.isAbstract)
-                .every((m) => _isRegisterMethod(m)))
+            c.methods.where((m) => m.isAbstract).every((m) => _isRegisterMethod(m)))
         .toList();
 
     if (injectors.isEmpty) {
       return null;
     }
 
-    final file = Library((lb) => lb
-      ..body.addAll(
-          injectors.map((i) => _generateInjector(i, library, buildStep))));
+    final file = Library((lb) => lb..body.addAll(injectors.map((i) => _generateInjector(i, library, buildStep))));
 
     final DartEmitter emitter = DartEmitter(Allocator());
     return DartFormatter().format('${file.accept(emitter)}');
   }
 
-  Class _generateInjector(
-      ClassElement injector, LibraryReader library, BuildStep buildStep) {
+  Class _generateInjector(ClassElement injector, LibraryReader library, BuildStep buildStep) {
     return Class((cb) => cb
       ..name = '_\$${injector.name}'
       ..extend = refer(injector.name)
@@ -71,8 +64,7 @@ class InjectorGenerator extends Generator {
   List<Code> _generateRegisters(MethodElement method) {
     return _registerTypeChecker
         .annotationsOfExact(method)
-        .map((a) =>
-            _generateRegister(AnnotatedElement(ConstantReader(a), method)))
+        .map((a) => _generateRegister(AnnotatedElement(ConstantReader(a), method)))
         .toList();
   }
 
@@ -83,33 +75,32 @@ class InjectorGenerator extends Generator {
     final String name = registerObject.getField('name').toStringValue();
     final DartType type = registerObject.getField('type').toTypeValue();
     final DartType concrete = registerObject.getField('from').toTypeValue();
+    final bool eagerInit = registerObject.getField('eagerInit').toBoolValue();
     final DartType concreteType = concrete ?? type;
 
     final String className = concreteType.name;
-    final String typeParameters =
-        concrete == null ? '' : '<${type.name}, $className>';
+    final String typeParameters = concrete == null ? '' : '<${type.name}, $className>';
 
-    final String nameArgument = name == null ? '' : ", name: '$name'";
-    final String constructorName =
-        registerObject.getField('constructorName').toStringValue();
-    final String constructorNameArgument =
-        constructorName == null ? '' : '.$constructorName';
+    final Map<String, String> namedArguments = {};
+    if (name != null) namedArguments["name"] = name;
+    if (eagerInit == true) namedArguments["eagerInit"] = "true";
+    final nameArgument =
+        namedArguments.isEmpty ? "" : "${namedArguments.entries.map((e) => ", ${e.key}: \"${e.value}\"").join("")}";
+
+    final String constructorName = registerObject.getField('constructorName').toStringValue();
+    final String constructorNameArgument = constructorName == null ? '' : '.$constructorName';
 
     final ClassElement clazz = concreteType.element.library.getType(className);
     if (clazz == null) {
       throw '$className not found';
     }
 
-    final bool oneTime =
-        registerObject.getField('oneTime').toBoolValue() ?? false;
-    final Map<DartType, String> resolvers =
-        _computeResolvers(registerObject.getField('resolvers').toMapValue());
+    final bool oneTime = registerObject.getField('oneTime').toBoolValue() ?? false;
+    final Map<DartType, String> resolvers = _computeResolvers(registerObject.getField('resolvers').toMapValue());
 
     final String methodSuffix = oneTime ? 'Singleton' : 'Factory';
 
-    final constructor = constructorName == null
-        ? clazz.unnamedConstructor
-        : clazz.getNamedConstructor(constructorName);
+    final constructor = constructorName == null ? clazz.unnamedConstructor : clazz.getNamedConstructor(constructorName);
 
     if (constructor == null) {
       throw ArgumentError(
@@ -130,9 +121,7 @@ class InjectorGenerator extends Generator {
     ConstructorElement constructor,
     Map<DartType, String> resolvers,
   ) {
-    return constructor.parameters
-        .map((p) => _generateRegisterArgument(p, resolvers))
-        .toList();
+    return constructor.parameters.map((p) => _generateRegisterArgument(p, resolvers)).toList();
   }
 
   String _generateRegisterArgument(
@@ -147,7 +136,6 @@ class InjectorGenerator extends Generator {
   Map<DartType, String> _computeResolvers(
     Map<DartObject, DartObject> resolvers,
   ) {
-    return resolvers?.map((key, value) =>
-        MapEntry<DartType, String>(key.toTypeValue(), value.toStringValue()));
+    return resolvers?.map((key, value) => MapEntry<DartType, String>(key.toTypeValue(), value.toStringValue()));
   }
 }
