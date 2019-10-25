@@ -187,8 +187,6 @@ class _Provider<T> {
   }
 }
 
-mixin LifecycleAware {
-  Future unregister() {
-    return Future.value();
-  }
+abstract class LifecycleAware {
+  unregister();
 }
