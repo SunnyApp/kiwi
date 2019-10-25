@@ -15,10 +15,6 @@ class Container {
 
   final Map<String, Map<Type, _Provider<Object>>> _namedProviders;
 
-  /// Whether this container has been initialized - which occurs when the first instance has been
-  /// requested
-  bool _initialized = false;
-
   /// Whether ignoring assertion errors in the following cases:
   /// * if you register the same type under the same name a second time.
   /// * if you try to resolve or unregister a type that was not
@@ -99,16 +95,6 @@ class Container {
   ///  * [Container.registerFactory] for register a builder function.
   ///  * [Container.registerInstance] for register an instance.
   T resolve<T>([String name]) {
-    if (_initialized != true) {
-      _namedProviders.values.forEach((_) {
-        _.values.forEach((provider) {
-          if (provider.eagerInit == true && provider.object == null) {
-            provider.get(this);
-          }
-        });
-      });
-      _initialized = true;
-    }
     Map<Type, _Provider<Object>> providers = _namedProviders[name];
 
     assert(silent || (providers?.containsKey(T) ?? false), _assertRegisterMessage<T>('not', name));
@@ -117,6 +103,17 @@ class Container {
     }
 
     return providers[T]?.get(this);
+  }
+
+  /// Initializes any singletons that are flagged [eagerInit]=true, so you don't have to manually instantiate them.
+  void initializeEagerSingletons() {
+    _namedProviders.values.forEach((_) {
+      _.values.forEach((provider) {
+        if (provider.eagerInit == true && provider.object == null) {
+          provider.get(this);
+        }
+      });
+    });
   }
 
   T call<T>([String name]) => resolve<T>(name);
