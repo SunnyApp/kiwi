@@ -15,6 +15,8 @@ class Container {
 
   final Map<String, Map<Type, _Provider<Object>>> _namedProviders;
 
+  final List<Type> _loadingStack = List<Type>();
+
   /// Whether ignoring assertion errors in the following cases:
   /// * if you register the same type under the same name a second time.
   /// * if you try to resolve or unregister a type that was not
@@ -102,7 +104,13 @@ class Container {
       return null;
     }
 
-    return providers[T]?.get(this);
+    if (_loadingStack.contains(T)) {
+      throw ("Circular dependency detected between the following: $_loadingStack");
+    }
+    _loadingStack.add(T);
+    final instance = providers[T]?.get(this);
+    _loadingStack.removeLast();
+    return instance;
   }
 
   /// Initializes any singletons that are flagged [eagerInit]=true, so you don't have to manually instantiate them.
