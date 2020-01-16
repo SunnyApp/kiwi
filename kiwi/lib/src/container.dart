@@ -1,5 +1,3 @@
-import 'package:kiwi/kiwi.dart';
-
 /// Signature for a builder which creates an object of type [T].
 typedef T Factory<T>(Container container);
 
@@ -11,7 +9,12 @@ class Container {
   static final Container _instance = new Container.scoped();
 
   /// Always returns a singleton representing the only container to be alive.
-  factory Container() => _instance;
+  factory Container({bool forceReload = false}) {
+    if (_instance._isInitialized && forceReload == true) {
+      _instance.clear();
+    }
+    return _instance;
+  }
 
   final Map<String, Map<Type, _Provider<Object>>> _namedProviders;
 
@@ -24,6 +27,13 @@ class Container {
   ///
   /// Defaults to false.
   bool silent = false;
+
+  /// Whether the container is initialized
+  bool _isInitialized = false;
+
+  bool get isInitialized {
+    return _isInitialized;
+  }
 
   /// Registers an instance into the container.
   ///
@@ -115,13 +125,17 @@ class Container {
 
   /// Initializes any singletons that are flagged [eagerInit]=true, so you don't have to manually instantiate them.
   void initializeEagerSingletons() {
-    _namedProviders.values.forEach((_) {
-      _.values.forEach((provider) {
-        if (provider.eagerInit == true && provider.object == null) {
-          provider.get(this);
-        }
+    try {
+      _namedProviders.values.forEach((_) {
+        _.values.forEach((provider) {
+          if (provider.eagerInit == true && provider.object == null) {
+            provider.get(this);
+          }
+        });
       });
-    });
+    } finally {
+      _isInitialized = true;
+    }
   }
 
   T call<T>([String name]) => resolve<T>(name);
@@ -130,15 +144,19 @@ class Container {
   ///
   /// After this, the container is empty.
   Future clear() async {
-    for (final instances in _namedProviders.values) {
-      for (final instance in instances.values) {
-        if (instance.object is LifecycleAware) {
-          await (instance.object as LifecycleAware).unregister();
+    try {
+      for (final instances in _namedProviders.values) {
+        for (final instance in instances.values) {
+          if (instance.object is LifecycleAware) {
+            await (instance.object as LifecycleAware).unregister();
+          }
         }
       }
-    }
 
-    _namedProviders.clear();
+      _namedProviders.clear();
+    } finally {
+      _isInitialized = false;
+    }
   }
 
   void _setProvider<T>(String name, _Provider<T> provider) {
@@ -193,5 +211,5 @@ class _Provider<T> {
 }
 
 abstract class LifecycleAware {
-  unregister();
+  Future unregister();
 }
