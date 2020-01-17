@@ -4,8 +4,11 @@ version: 0.2.0
 author: Romain Rastel <lets4r@gmail.com>
 homepage: https://github.com/letsar/kiwi
 
+dependencies:
+  logging: ^0.11.3+2
+
 environment:
-  sdk: '>=2.2.0 <3.0.0'
+  sdk: '>=2.6.0 <3.0.0'
 
 dev_dependencies:
   test: ^1.9.3

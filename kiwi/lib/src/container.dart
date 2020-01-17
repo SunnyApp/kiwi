@@ -1,17 +1,25 @@
+import 'dart:async';
+
+import 'package:logging/logging.dart';
+
 /// Signature for a builder which creates an object of type [T].
 typedef T Factory<T>(Container container);
 
 /// A simple service container.
 class Container {
+  Logger log;
+
   /// Creates a scoped container.
-  Container.scoped() : _namedProviders = Map<String, Map<Type, _Provider<Object>>>();
+  Container.scoped([String debugName])
+      : _namedProviders = Map<String, Map<Type, _Provider<Object>>>(),
+        log = Logger(debugName ?? " kiwi");
 
   static final Container _instance = new Container.scoped();
 
   /// Always returns a singleton representing the only container to be alive.
-  factory Container({bool forceReload = false}) {
-    if (_instance._isInitialized && forceReload == true) {
-      _instance.clear();
+  factory Container({String debugName}) {
+    if (debugName != null) {
+      _instance.log = Logger(debugName);
     }
     return _instance;
   }
@@ -47,6 +55,8 @@ class Container {
     S instance, {
     String name,
   }) {
+    log.fine(
+        "Register provider: ${name ?? '[none]'}, type: ${instance.runtimeType}");
     _setProvider(name, _Provider<S>.instance(instance));
   }
 
@@ -62,6 +72,7 @@ class Container {
     Factory<S> factory, {
     String name,
   }) {
+    log.fine("Register factory: ${name ?? '[none]'}, type: ${T} for ${S}");
     _setProvider(name, _Provider<S>.factory(factory));
   }
 
@@ -79,25 +90,33 @@ class Container {
     String name,
     bool eagerInit = false,
   }) {
+    log.fine("Register singleton: ${name ?? '[none]'}, type: ${T} for ${S}");
     _setProvider(name, _Provider<S>.singleton(factory, eagerInit: eagerInit));
   }
 
   /// Removes the entry previously registered for the type [T].
   ///
   /// If [name] is set, removes the one registered for that name.
-  void unregister<T>([String name]) {
-    assert(silent || (_namedProviders[name]?.containsKey(T) ?? false), _assertRegisterMessage<T>('not', name));
+  Future unregister<T>([String name]) async {
+    assert(silent || (_namedProviders[name]?.containsKey(T) ?? false),
+        _assertRegisterMessage<T>('not', name));
     final provider = _namedProviders[name];
     if (provider != null) {
       final instance = provider[T];
       if (instance is LifecycleAware) {
-        (instance as LifecycleAware).unregister();
+        await (instance as LifecycleAware)
+            .onLifecycleEvent(LifecycleEvent.stop);
+        log.fine("Unregister: non-existant $name ($T)");
+      } else {
+        log.finer("Unregister no lifecycle $name ($T)");
       }
       provider.remove(T);
+    } else {
+      log.fine("Unregister: non-existant $name ($T)");
     }
   }
 
-  /// Attemps to resolve the type [T].
+  /// Attempts to resolve the type [T].
   ///
   /// If [name] is set, the instance or builder registered with this
   /// name will be get.
@@ -109,7 +128,8 @@ class Container {
   T resolve<T>([String name]) {
     Map<Type, _Provider<Object>> providers = _namedProviders[name];
 
-    assert(silent || (providers?.containsKey(T) ?? false), _assertRegisterMessage<T>('not', name));
+    assert(silent || (providers?.containsKey(T) ?? false),
+        _assertRegisterMessage<T>('not', name));
     if (providers == null) {
       return null;
     }
@@ -124,15 +144,22 @@ class Container {
   }
 
   /// Initializes any singletons that are flagged [eagerInit]=true, so you don't have to manually instantiate them.
-  void initializeEagerSingletons() {
+  Future initializeEagerSingletons() async {
     try {
-      _namedProviders.values.forEach((_) {
-        _.values.forEach((provider) {
+      log.info("Initializing eager singletons");
+      assert(_isInitialized != true);
+      for (final _ in _namedProviders.values) {
+        for (final provider in _.values) {
           if (provider.eagerInit == true && provider.object == null) {
-            provider.get(this);
+            final instance = provider.get(this);
+            log.fine(
+                "\t - Initializing eager singleton: ${instance.runtimeType}, lifecycle: ${instance is LifecycleAware}");
+            if (instance is LifecycleAware) {
+              await instance.onLifecycleEvent(LifecycleEvent.start);
+            }
           }
-        });
-      });
+        }
+      }
     } finally {
       _isInitialized = true;
     }
@@ -140,20 +167,42 @@ class Container {
 
   T call<T>([String name]) => resolve<T>(name);
 
+  void forEachProvider<T>(void onEach(Type type, _Provider provider)) {
+    _namedProviders.values.forEach((map) {
+      map.forEach(onEach);
+    });
+  }
+
   /// Removes all instances and builders from the container.
   ///
   /// After this, the container is empty.
   Future clear() async {
     try {
-      for (final instances in _namedProviders.values) {
+      int count = 0;
+      forEachProvider((_, __) => count++);
+      if (count > 0) {
+        log.info("Clearing container");
+        forEachProvider((type, provider) => log.fine("Clearing $type"));
+      }
+      final values = [..._namedProviders.values];
+      _namedProviders.clear();
+      _isInitialized = false;
+
+      for (final instances in values) {
         for (final instance in instances.values) {
           if (instance.object is LifecycleAware) {
-            await (instance.object as LifecycleAware).unregister();
+            log.fine(
+                "\t - Destroying singleton: ${instance.runtimeType}, lifecycle: ${instance.object is LifecycleAware}");
+            try {
+              await (instance.object as LifecycleAware)
+                  .onLifecycleEvent(LifecycleEvent.stop);
+            } catch (e) {
+              log.severe("Error shutting down ${instance.object}");
+              // not going to rethrow because we don't want to mess with other items
+            }
           }
         }
       }
-
-      _namedProviders.clear();
     } finally {
       _isInitialized = false;
     }
@@ -161,15 +210,18 @@ class Container {
 
   void _setProvider<T>(String name, _Provider<T> provider) {
     assert(
-      silent || (!_namedProviders.containsKey(name) || !_namedProviders[name].containsKey(T)),
+      silent ||
+          (!_namedProviders.containsKey(name) ||
+              !_namedProviders[name].containsKey(T)),
       _assertRegisterMessage<T>('already', name),
     );
 
-    _namedProviders.putIfAbsent(name, () => Map<Type, _Provider<Object>>())[T] = provider;
+    _namedProviders.putIfAbsent(name, () => Map<Type, _Provider<Object>>())[T] =
+        provider;
   }
 
   String _assertRegisterMessage<T>(String word, String name) {
-    return 'The type $T was $word registered${name == null ? '' : ' for the name $name'}';
+    return 'The type $T was $word registered${name == null ? '' : ' for the name $name'} => $_loadingStack';
   }
 }
 
@@ -183,7 +235,8 @@ class _Provider<T> {
       : eagerInit = false,
         _oneTime = false;
 
-  _Provider.singleton(this.instanceBuilder, {this.eagerInit = false}) : _oneTime = true;
+  _Provider.singleton(this.instanceBuilder, {this.eagerInit = false})
+      : _oneTime = true;
 
   final Factory<T> instanceBuilder;
   T object;
@@ -208,8 +261,33 @@ class _Provider<T> {
 
     return null;
   }
+
+  @override
+  String toString() {
+    var str = 'Provider{type: ${T}';
+    if (eagerInit == true) str += "; eager = true";
+    if (_oneTime == true) str += "; singleton";
+    str += "}";
+    return str;
+  }
 }
 
+enum LifecycleEvent { start, stop }
+
 abstract class LifecycleAware {
-  Future unregister();
+  FutureOr onLifecycleEvent(LifecycleEvent event);
+}
+
+mixin LifecycleAwareMixin implements LifecycleAware {
+  FutureOr onInit() {}
+  FutureOr onDestroy() {}
+
+  FutureOr onLifecycleEvent(LifecycleEvent event) {
+    switch (event) {
+      case LifecycleEvent.start:
+        return onInit();
+      case LifecycleEvent.stop:
+        return onDestroy();
+    }
+  }
 }
