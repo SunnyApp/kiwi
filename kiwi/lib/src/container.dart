@@ -117,8 +117,9 @@ class Container {
 
   Instance<T> instance<T>([String name]) {
     Map<Type, _Provider<Object>> providers = _namedProviders[name];
-
-    assert(silent || (providers?.containsKey(T) ?? false), _assertRegisterMessage<T>('not', name));
+    if (!silent && !(providers?.containsKey(T) ?? false)) {
+      throw "No component registered for $T ${name == null ? '' : "name=$name"}";
+    }
     if (providers == null) {
       return null;
     }
@@ -185,8 +186,8 @@ class Container {
           }),
           eagerError: true);
       log.info("\t - ** Done initializing singletons");
-    } catch (e) {
-      log.severe("Error loading: $e", e);
+    } catch (e, stack) {
+      log.severe("Error loading: $e", e, stack);
       print("############################################################");
       print("Error! $e");
       print("############################################################");
