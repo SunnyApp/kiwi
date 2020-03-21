@@ -13,10 +13,10 @@ class Container {
 
   /// Creates a scoped container.
   Container.scoped([String debugName])
-      : _namedProviders = Map<String, Map<Type, _Provider<Object>>>(),
+      : _namedProviders = <String, Map<String, _Provider>>{},
         log = Logger(debugName ?? "kiwi");
 
-  static final Container _instance = new Container.scoped();
+  static final Container _instance = Container.scoped();
 
   /// Always returns a singleton representing the only container to be alive.
   factory Container({String debugName}) {
@@ -26,9 +26,9 @@ class Container {
     return _instance;
   }
 
-  final Map<String, Map<Type, _Provider<Object>>> _namedProviders;
+  final Map<String, Map<String, _Provider>> _namedProviders;
 
-  final List<Type> _loadingStack = List<Type>();
+  final List<String> _loadingStack = <String>[];
 
   /// Whether ignoring assertion errors in the following cases:
   /// * if you register the same type under the same name a second time.
@@ -54,11 +54,17 @@ class Container {
   /// To retrieve the same instance, the same name should be provided
   /// to [Container.resolve].
   void registerInstance<S, T extends S>(
-    S instance, {
+    T instance, {
     String name,
   }) {
-    log.fine("Register provider: ${name ?? '[none]'}, type: ${instance.runtimeType}");
-    _setProvider(name, _Provider<S>.instance(Instance(instance)));
+    Type registeredType = S;
+    if (registeredType == dynamic) registeredType = T;
+    if (registeredType == dynamic) {
+      throw "Invalid registration.  The type variables S and T cannot be dynamic, but "
+          "were $S and $T, respectively";
+    }
+    log.fine("Register provider: ${name ?? '[none]'}, type: $registeredType");
+    _setProvider(name, _Provider.instance(Instance(instance), "$registeredType"));
   }
 
   /// Registers a factory into the container.
@@ -73,8 +79,14 @@ class Container {
     Factory<S> factory, {
     String name,
   }) {
-    log.fine("Register factory: ${name ?? '[none]'}, type: ${T} for ${S}");
-    _setProvider(name, _Provider<S>.factory(factory));
+    Type registeredType = S;
+    if (registeredType == dynamic) registeredType = T;
+    if (registeredType == dynamic) {
+      throw "Invalid registration.  The type variables S and T cannot be dynamic, but "
+          "were $S and $T, respectively";
+    }
+    log.fine("Register factory: ${name ?? '[none]'}, type: $T for $S");
+    _setProvider(name, _Provider.factory(factory, "$S"));
   }
 
   /// Registers a factory that will be called only only when
@@ -91,46 +103,53 @@ class Container {
     String name,
     bool eagerInit = false,
   }) {
-    log.fine("Register singleton: ${name ?? '[none]'}, type: ${T} for ${S}");
-    _setProvider(name, _Provider<S>.singleton(factory, eagerInit: eagerInit));
+    if (S == dynamic || T == dynamic) {
+      throw "Invalid registration.  The type variables S and T cannot be dynamic, but "
+          "were $S and $T, respectively";
+    }
+    log.fine("Register singleton: ${name ?? '[none]'}, type: $T for $S");
+    _setProvider(name, _Provider.singleton(factory, type: "$S", eagerInit: eagerInit));
   }
 
   /// Removes the entry previously registered for the type [T].
   ///
   /// If [name] is set, removes the one registered for that name.
   Future unregister<T>([String name]) async {
-    assert(silent || (_namedProviders[name]?.containsKey(T) ?? false), _assertRegisterMessage<T>('not', name));
+    final typeName = "$T";
+    assert(silent || (_namedProviders[name]?.containsKey(typeName) ?? false),
+        _assertRegisterMessage('not', name, typeName));
     final namedProvider = _namedProviders[name];
     if (namedProvider != null) {
-      final provider = namedProvider[T];
+      final provider = namedProvider[typeName];
       if (provider?.object?.value is LifecycleAware) {
         await (provider.object?.value as LifecycleAware).onLifecycleEvent(LifecycleEvent.stop);
-        log.fine("Unregister: non-existant $name ($T)");
+        log.fine("Unregister: non-existant $name ($typeName)");
       } else {
-        log.finer("Unregister no lifecycle $name ($T)");
+        log.finer("Unregister no lifecycle $name ($typeName)");
       }
-      namedProvider.remove(T);
+      namedProvider.remove(typeName);
     } else {
-      log.fine("Unregister: non-existant $name ($T)");
+      log.fine("Unregister: non-existant $name ($typeName)");
     }
   }
 
-  Instance<T> instance<T>([String name]) {
-    Map<Type, _Provider<Object>> providers = _namedProviders[name];
-    if (!silent && !(providers?.containsKey(T) ?? false)) {
-      throw "No component registered for $T ${name == null ? '' : "name=$name"}";
+  Instance instance<T>([String name]) {
+    final typeName = "$T";
+    Map<String, _Provider> providers = _namedProviders[name];
+    if (!silent && !(providers?.containsKey(typeName) ?? false)) {
+      throw AssertionError("No component registered for $typeName ${name == null ? '' : "name=$name"}");
     }
     if (providers == null) {
       return null;
     }
 
-    final indexOf = _loadingStack.indexOf(T);
+    final indexOf = _loadingStack.indexOf(typeName);
     if (indexOf > -1 && indexOf < _loadingStack.length - 1) {
-      throw ("Circular dependency detected between the following: $_loadingStack - when loading $T");
+      throw ("Circular dependency detected between the following: $_loadingStack - when loading $typeName");
     }
 
-    _loadingStack.add(T);
-    final instance = providers[T]?.get(this);
+    _loadingStack.add(typeName);
+    final instance = providers[typeName]?.get(this);
     _loadingStack.removeLast();
     return instance;
   }
@@ -144,8 +163,17 @@ class Container {
   ///
   ///  * [Container.registerFactory] for register a builder function.
   ///  * [Container.registerInstance] for register an instance.
+  T call<T>([String name]) => resolve<T>(name);
+
   T resolve<T>([String name]) {
-    return instance<T>(name).value;
+    if ("$T" == "$dynamic") {
+      throw 'Cannot request type dynamic';
+    }
+    final result = instance<T>(name)?.value;
+    if (result != null && result is! T) {
+      throw "Invalid container result.  Expected $T but got ${result.runtimeType ?? 'null'}";
+    }
+    return result as T;
   }
 
   /// Initializes any singletons that are flagged [eagerInit]=true, so you don't have to manually instantiate them.
@@ -178,11 +206,16 @@ class Container {
       }
 
       await Future.wait(
-          _providers.where((provider) => provider.eagerInit == true && provider.object == null).map((provider) {
-            final instance = provider.get(this);
-            log.fine(
-                "\t - Initializing eager singleton: ${instance.runtimeType}, lifecycle: ${instance.value is LifecycleAware}");
-            return instance.ready.timeout(Duration(seconds: 10));
+          _providers.where((provider) => provider.eagerInit == true && provider.object == null).map((provider) async {
+            try {
+              final instance = provider.get(this);
+              log.fine(
+                  "\t - Initializing eager singleton: ${provider.type}, lifecycle: ${instance.value is LifecycleAware}");
+              return await instance.ready.timeout(Duration(seconds: 10));
+            } catch (e, stack) {
+              log.severe("Error loading ${provider.type}", e, stack);
+              rethrow;
+            }
           }),
           eagerError: true);
       log.info("\t - ** Done initializing singletons");
@@ -190,14 +223,13 @@ class Container {
       log.severe("Error loading: $e", e, stack);
       print("############################################################");
       print("Error! $e");
+      print(stack);
       print("############################################################");
       rethrow;
     }
   }
 
-  T call<T>([String name]) => resolve<T>(name);
-
-  void forEachProvider<T>(void onEach(Type type, _Provider provider)) {
+  void forEachProvider(void onEach(String type, _Provider provider)) {
     _namedProviders.values.forEach((map) {
       map.forEach(onEach);
     });
@@ -242,44 +274,54 @@ class Container {
     _state = ContainerState.Building;
   }
 
-  void _setProvider<T>(String name, _Provider<T> provider) {
+  void _setProvider(String name, _Provider provider) {
     assert(
-      silent || (!_namedProviders.containsKey(name) || !_namedProviders[name].containsKey(T)),
-      _assertRegisterMessage<T>('already', name),
+      silent || (!_namedProviders.containsKey(name) || !_namedProviders[name].containsKey(provider.type)),
+      _assertRegisterMessage('already', name, provider.type),
     );
 
-    _namedProviders.putIfAbsent(name, () => Map<Type, _Provider<Object>>())[T] = provider;
+    _namedProviders.putIfAbsent(name, () => <String, _Provider>{})[provider.type] = provider;
   }
 
-  String _assertRegisterMessage<T>(String word, String name) {
-    return 'The type $T was $word registered${name == null ? '' : ' for the name $name'} => $_loadingStack';
+  String _assertRegisterMessage(String word, String name, String type) {
+    return 'The type $type was $word registered${name == null ? '' : ' for the name $name'} => loading stack: $_loadingStack';
   }
 }
 
-class _Provider<T> {
-  _Provider.instance(this.object)
-      : instanceBuilder = null,
+T invalidProvider<T>(String message) {
+  throw message;
+}
+
+class _Provider {
+  _Provider.instance(this.object, this.type)
+      : assert(object != null),
+        assert(type != null),
+        instanceBuilder = null,
         eagerInit = false,
         _oneTime = false;
 
-  _Provider.factory(this.instanceBuilder)
-      : eagerInit = false,
+  _Provider.factory(this.instanceBuilder, this.type)
+      : assert(type != null),
+        eagerInit = false,
         _oneTime = false;
 
-  _Provider.singleton(this.instanceBuilder, {this.eagerInit = false}) : _oneTime = true;
+  _Provider.singleton(this.instanceBuilder, {@required this.type, this.eagerInit = false})
+      : assert(type != null),
+        _oneTime = true;
 
-  final Factory<T> instanceBuilder;
-  Instance<T> object;
+  final String type;
+  final Factory instanceBuilder;
+  Instance object;
   bool _oneTime = false;
 
   /// Only applies to singletons
   final bool eagerInit;
 
-  Instance<T> get(Container container) {
+  Instance get(Container container) {
     if (_oneTime && instanceBuilder != null) {
       final inst = instanceBuilder(container);
       if (inst is LifecycleAware) {
-        object = Instance(inst, init: (inst).onLifecycleEvent(LifecycleEvent.start));
+        object = Instance(inst, init: Future.value((inst).onLifecycleEvent(LifecycleEvent.start)));
       } else {
         object = Instance(inst);
       }
@@ -293,7 +335,7 @@ class _Provider<T> {
     if (instanceBuilder != null) {
       final inst = instanceBuilder(container);
       if (inst is LifecycleAware) {
-        return Instance(inst, init: inst.onLifecycleEvent(LifecycleEvent.start));
+        return Instance(inst, init: Future.value(inst.onLifecycleEvent(LifecycleEvent.start)));
       } else {
         return Instance(inst);
       }
@@ -304,7 +346,7 @@ class _Provider<T> {
 
   @override
   String toString() {
-    var str = '${T} { ';
+    var str = '$type { ';
     if (eagerInit == true) str += "eager, ";
     if (_oneTime == true) {
       str += "singleton, ${object == null ? 'uninitialized ' : 'initialized '}";
@@ -317,9 +359,9 @@ class _Provider<T> {
   }
 }
 
-class Instance<T> {
-  final T value;
-  final Completer<T> _completer;
+class Instance {
+  final Object value;
+  final Completer _completer;
 
   Instance(this.value, {Future init}) : _completer = Completer() {
     if (init == null) {
@@ -333,7 +375,7 @@ class Instance<T> {
     }
   }
 
-  Future<T> get ready => _completer.future;
+  Future get ready => _completer.future;
 }
 
 enum LifecycleEvent { start, stop }

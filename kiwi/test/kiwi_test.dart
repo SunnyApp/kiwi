@@ -1,4 +1,5 @@
 import 'package:kiwi/kiwi.dart';
+import 'package:matcher/matcher.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -25,11 +26,11 @@ void main() {
       );
       container.registerInstance(person);
 
-      expect(container.resolve<int>(), 5);
-      expect(container.resolve<int>('named'), 6);
-      expect(container.resolve<num>(), 7);
-      expect(container.resolve<num>('named'), null);
-      expect(container.resolve<Character>(), person);
+      expect(container<int>(), 5);
+      expect(container<int>('named'), 6);
+      expect(container<num>(), 7);
+      expect(container<num>('named'), null);
+      expect(container<Character>(), person);
     });
 
     test('container should resolve when called', () {
@@ -50,65 +51,74 @@ void main() {
 
     test('instances can be overridden', () {
       container.registerInstance(5);
-      expect(container.resolve<int>(), 5);
+      expect(container<int>(), 5);
 
       container.registerInstance(6);
-      expect(container.resolve<int>(), 6);
+      expect(container<int>(), 6);
+    });
+
+    test('Cant register dynamic singleton', () {
+      expect(() {
+        container.registerSingleton((container) {
+          return "factory" as dynamic;
+        });
+      }, throwsA(anything));
+    });
+
+    test('Cant retrieve dynamic singleton', () {
+      expect(() {
+        container.registerSingleton<String, String>((container) {
+          container<dynamic>();
+          return "Foo";
+        });
+        return container<String>();
+      }, throwsA(anything));
     });
 
     test('builders should be resolved', () {
       container.registerSingleton((c) => 5);
-      container.registerFactory(
-          (c) => const Sith('Anakin', 'Skywalker', 'DartVader'));
-      container.registerFactory<Character, Sith>(
-          (c) => const Character('Anakin', 'Skywalker'));
+      container.registerFactory((c) => const Sith('Anakin', 'Skywalker', 'DartVader'));
+      container.registerFactory<Character, Sith>((c) => const Character('Anakin', 'Skywalker'));
 
-      expect(container.resolve<int>(), 5);
-      expect(container.resolve<Sith>(),
-          const Sith('Anakin', 'Skywalker', 'DartVader'));
-      expect(container.resolve<Character>(),
-          const Character('Anakin', 'Skywalker'));
+      expect(container<int>(), 5);
+      expect(container<Sith>(), const Sith('Anakin', 'Skywalker', 'DartVader'));
+      expect(container<Character>(), const Character('Anakin', 'Skywalker'));
     });
 
     test('builders should always be created', () {
       container.registerFactory((c) => Character('Anakin', 'Skywalker'));
 
-      expect(container.resolve<Character>(),
-          isNot(same(container.resolve<Character>())));
+      expect(container<Character>(), isNot(same(container<Character>())));
     });
 
     test('one time builders should be resolved', () {
       container.registerSingleton((c) => 5);
-      container.registerSingleton(
-          (c) => const Sith('Anakin', 'Skywalker', 'DartVader'));
-      container.registerSingleton<Character, Sith>(
-          (c) => const Character('Anakin', 'Skywalker'));
+      container.registerSingleton((c) => const Sith('Anakin', 'Skywalker', 'DartVader'));
+      container.registerSingleton<Character, Sith>((c) => const Character('Anakin', 'Skywalker'));
 
-      expect(container.resolve<int>(), 5);
-      expect(container.resolve<Sith>(),
-          const Sith('Anakin', 'Skywalker', 'DartVader'));
-      expect(container.resolve<Character>(),
-          const Character('Anakin', 'Skywalker'));
+      expect(container<int>(), 5);
+      expect(container<Sith>(), const Sith('Anakin', 'Skywalker', 'DartVader'));
+      expect(container<Character>(), const Character('Anakin', 'Skywalker'));
     });
 
     test('one time builders should be created one time only', () {
       container.registerSingleton((c) => Character('Anakin', 'Skywalker'));
 
-      expect(container.resolve<Character>(), container.resolve<Character>());
+      expect(container<Character>(), container<Character>());
     });
 
     test('unregister should remove items from container', () {
       container.registerInstance(5);
       container.registerInstance(6, name: 'named');
 
-      expect(container.resolve<int>(), 5);
-      expect(container.resolve<int>('named'), 6);
+      expect(container<int>(), 5);
+      expect(container<int>('named'), 6);
 
       container.unregister<int>();
-      expect(container.resolve<int>(), null);
+      expect(container<int>(), null);
 
       container.unregister<int>('named');
-      expect(container.resolve<int>('named'), null);
+      expect(container<int>('named'), null);
     });
   });
 
@@ -120,17 +130,17 @@ void main() {
 
     test('instances cannot be overridden', () {
       container.registerInstance(5);
-      expect(container.resolve<int>(), 5);
+      expect(container<int>(), 5);
 
       container.registerInstance(8, name: 'name');
-      expect(container.resolve<int>('name'), 8);
+      expect(container<int>('name'), 8);
 
       expect(
           () => container.registerInstance(6),
           throwsA(TypeMatcher<AssertionError>().having(
             (f) => f.message,
             'message',
-            'The type int was already registered',
+            startsWith('The type int was already registered'),
           )));
 
       expect(
@@ -138,7 +148,7 @@ void main() {
           throwsA(TypeMatcher<AssertionError>().having(
             (f) => f.message,
             'message',
-            'The type int was already registered for the name name',
+            startsWith('The type int was already registered for the name name'),
           )));
     });
 
@@ -148,7 +158,7 @@ void main() {
           throwsA(TypeMatcher<AssertionError>().having(
             (f) => f.message,
             'message',
-            'The type int was not registered',
+            startsWith('The type int was not registered'),
           )));
 
       expect(
@@ -156,25 +166,25 @@ void main() {
           throwsA(TypeMatcher<AssertionError>().having(
             (f) => f.message,
             'message',
-            'The type int was not registered for the name name',
+            startsWith('The type int was not registered for the name name'),
           )));
     });
 
     test('values should exist when resolving', () {
       expect(
-          () => container.resolve<int>(),
+          () => container<int>(),
           throwsA(TypeMatcher<AssertionError>().having(
             (f) => f.message,
             'message',
-            'The type int was not registered',
+            startsWith('No component registered for int'),
           )));
 
       expect(
-          () => container.resolve<int>('name'),
+          () => container<int>('name'),
           throwsA(TypeMatcher<AssertionError>().having(
             (f) => f.message,
             'message',
-            'The type int was not registered for the name name',
+            'No component registered for int name=name',
           )));
     });
   });
