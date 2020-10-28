@@ -104,8 +104,8 @@ class Container {
     bool eagerInit = false,
   }) {
     if (S == dynamic || T == dynamic) {
-      throw "Invalid registration.  The type variables S and T cannot be dynamic, but "
-          "were $S and $T, respectively";
+      throw 'Invalid registration.  The type variables S and T cannot be dynamic, but '
+          'were $S and $T, respectively';
     }
     log.fine("Register singleton: ${name ?? '[none]'}, type: $T for $S");
     _setProvider(name, _Provider.singleton(factory, type: "$S", eagerInit: eagerInit));
@@ -115,7 +115,7 @@ class Container {
   ///
   /// If [name] is set, removes the one registered for that name.
   Future unregister<T>([String name]) async {
-    final typeName = "$T";
+    final typeName = '$T';
     assert(silent || (_namedProviders[name]?.containsKey(typeName) ?? false),
         _assertRegisterMessage('not', name, typeName));
     final namedProvider = _namedProviders[name];
@@ -123,18 +123,19 @@ class Container {
       final provider = namedProvider[typeName];
       if (provider?.object?.value is LifecycleAware) {
         await (provider.object?.value as LifecycleAware).onLifecycleEvent(LifecycleEvent.stop);
-        log.fine("Unregister: non-existant $name ($typeName)");
+        log.fine('Unregister: non-existant $name ($typeName)');
       } else {
-        log.finer("Unregister no lifecycle $name ($typeName)");
+        log.finer('Unregister no lifecycle $name ($typeName)');
       }
       namedProvider.remove(typeName);
     } else {
-      log.fine("Unregister: non-existant $name ($typeName)");
+      log.fine('Unregister: non-existant $name ($typeName)');
     }
   }
 
   Instance instance<T>([String name]) {
-    final typeName = "$T";
+    final typeName = '$T';
+    // ignore: omit_local_variable_types
     Map<String, _Provider> providers = _namedProviders[name];
     if (!silent && !(providers?.containsKey(typeName) ?? false)) {
       throw AssertionError("No component registered for $typeName ${name == null ? '' : "name=$name"}");
@@ -145,7 +146,7 @@ class Container {
 
     final indexOf = _loadingStack.indexOf(typeName);
     if (indexOf > -1 && indexOf < _loadingStack.length - 1) {
-      throw ("Circular dependency detected between the following: $_loadingStack - when loading $typeName");
+      throw ('Circular dependency detected between the following: $_loadingStack - when loading $typeName');
     }
 
     _loadingStack.add(typeName);
