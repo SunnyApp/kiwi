@@ -1,6 +1,6 @@
 import 'package:kiwi/kiwi.dart';
 
-main() {
+void main() {
   Container container = Container();
   container.registerInstance(Logger());
   container.registerSingleton((c) => Logger(), name: 'logA');

@@ -3,30 +3,6 @@ include: package:pedantic/analysis_options.yaml
 # COPIED FROM FLUTTER https://github.com/flutter/flutter/blob/master/analysis_options.yaml
 
 analyzer:
-  exclude:
-    - "bin/cache/**"
-    # the following two are relative to the stocks example and the flutter package respectively
-    # see https://github.com/dart-lang/sdk/issues/28463
-    - "lib/l10n/*.p.dart"
-    - "lib/src/http/**"
-    - ".idea/"
-    - "lib/ext/*.dart"
-    - "lib/ext/**"
-    - "fastlane"
-    - "test_driver/**"
-    - "lib/sdk/**/model/*.dart"
-    - "lib/service/sql/*.g.dart"
-    - "lib/sdk/*/model/*.dart"
-    - "lib/sdk/**/api/*_api.dart"
-    - "lib/sdk/*/api/*_api.dart"
-    - "lib/sdk/contact_v2/contact_v2.dart"
-    - "lib/sdk/fact_schemas/fact_schemas.dart"
-    - "lib/sdk/facts/facts.dart"
-    - "lib/sdk/scheduling/scheduling.dart"
-    - "lib/sdk/smart_dates/smart_dates.dart"
-    - "lib/sdk/sunny/sunny.dart"
-    - "lib/sdk/truman/truman.dart"
-    - "lib/sdk/waypoints/waypoints.dart"
   strong-mode:
     implicit-casts: false
   enable-experiment:
@@ -42,6 +18,9 @@ analyzer:
     # Stream and not importing dart:async
     # Please see https://github.com/flutter/flutter/pull/24528 for details.
     sdk_version_async_exported_from_core: ignore
+    prefer_single_quotes: ignore
+    omit_local_variable_types: ignore
+    use_function_type_syntax_for_parameters: ignore
 
 linter:
   rules:
@@ -133,7 +112,7 @@ linter:
     #- prefer_const_literals_to_create_immutables
     # - prefer_constructors_over_static_methods # not yet tested
     - prefer_contains
-    # - prefer_double_quotes # opposite of prefer_single_quotes
+    #- prefer_double_quotes # opposite of prefer_single_quotes
     #- prefer_equal_for_default_values
     # - prefer_expression_function_bodies # conflicts with https://github.com/flutter/flutter/wiki/Style-guide-for-Flutter-repo#consider-using--for-short-functions-and-methods
     # - prefer_final_fields
