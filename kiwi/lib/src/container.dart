@@ -4,6 +4,8 @@ import 'package:logging/logging.dart';
 import 'package:meta/meta.dart';
 import 'package:uuid/uuid.dart';
 
+final _log = Logger("factory");
+
 /// Signature for a builder which creates an object of type [T].
 typedef Factory<T> = T Function(Container container);
 
@@ -56,6 +58,7 @@ class Container {
   void registerInstance<S, T extends S>(
     T instance, {
     String name,
+    bool isSilent,
   }) {
     Type registeredType = S;
     if (registeredType == dynamic) registeredType = T;
@@ -65,7 +68,8 @@ class Container {
     }
     log.fine("Register provider: ${name ?? '[none]'}, type: $registeredType");
     _setProvider(
-        name, _Provider.instance(Instance(instance), "$registeredType"));
+        name, _Provider.instance(Instance(instance), "$registeredType"),
+        isSilent: isSilent);
   }
 
   /// Registers a factory into the container.
@@ -79,6 +83,7 @@ class Container {
   void registerFactory<S, T extends S>(
     Factory<S> factory, {
     String name,
+    bool isSilent,
   }) {
     Type registeredType = S;
     if (registeredType == dynamic) registeredType = T;
@@ -87,7 +92,7 @@ class Container {
           "were $S and $T, respectively";
     }
     log.fine("Register factory: ${name ?? '[none]'}, type: $T for $S");
-    _setProvider(name, _Provider.factory(factory, "$S"));
+    _setProvider(name, _Provider.factory(factory, "$S"), isSilent: isSilent);
   }
 
   /// Registers a factory that will be called only only when
@@ -103,6 +108,7 @@ class Container {
     Factory<S> factory, {
     String name,
     bool eagerInit = false,
+    bool isSilent,
   }) {
     if (S == dynamic || T == dynamic) {
       throw 'Invalid registration.  The type variables S and T cannot be dynamic, but '
@@ -110,15 +116,19 @@ class Container {
     }
     log.fine("Register singleton: ${name ?? '[none]'}, type: $T for $S");
     _setProvider(
-        name, _Provider.singleton(factory, type: "$S", eagerInit: eagerInit));
+      name,
+      _Provider.singleton(factory, type: "$S", eagerInit: eagerInit),
+      isSilent: isSilent,
+    );
   }
 
   /// Removes the entry previously registered for the type [T].
   ///
   /// If [name] is set, removes the one registered for that name.
-  Future unregister<T>([String name]) async {
+  Future unregister<T>({String name, bool isSilent}) async {
+    isSilent ??= silent;
     final typeName = '$T';
-    assert(silent || (_namedProviders[name]?.containsKey(typeName) ?? false),
+    assert(isSilent || (_namedProviders[name]?.containsKey(typeName) ?? false),
         _assertRegisterMessage('not', name, typeName));
     final namedProvider = _namedProviders[name];
     if (namedProvider != null) {
@@ -185,8 +195,8 @@ class Container {
   /// one that implements [T]
   T searchForImplementation<T>([String name]) {
     if (!silent) {
-      log.warning(
-          "Doing a slow fallback for type $T because no implementation could be found.  "
+      log.fine(
+          "Doing a type-based lookup for type $T because no registered implementation.  "
           "To speed this up, you should register this entity manually at startup");
     }
     final provider = _namedProviders.values.expand((e) => e.values).firstWhere(
@@ -330,9 +340,10 @@ class Container {
     _state = ContainerState.Building;
   }
 
-  void _setProvider(String name, _Provider provider) {
+  void _setProvider(String name, _Provider provider, {bool isSilent}) {
+    isSilent ??= silent;
     assert(
-      silent ||
+      isSilent ||
           (!_namedProviders.containsKey(name) ||
               !_namedProviders[name].containsKey(provider.type)),
       _assertRegisterMessage('already', name, provider.type),
@@ -378,32 +389,38 @@ class _Provider {
   final bool eagerInit;
 
   Instance get(Container container) {
-    if (_oneTime && instanceBuilder != null) {
-      final inst = instanceBuilder(container);
-      if (inst is LifecycleAware) {
-        object = Instance(inst,
-            init: Future.value((inst).onLifecycleEvent(LifecycleEvent.start)));
-      } else {
-        object = Instance(inst);
+    try {
+      if (_oneTime && instanceBuilder != null) {
+        final inst = instanceBuilder(container);
+        if (inst is LifecycleAware) {
+          object = Instance(inst,
+              init:
+                  Future.value((inst).onLifecycleEvent(LifecycleEvent.start)));
+        } else {
+          object = Instance(inst);
+        }
+        _oneTime = false;
       }
-      _oneTime = false;
-    }
 
-    if (object != null) {
-      return object;
-    }
-
-    if (instanceBuilder != null) {
-      final inst = instanceBuilder(container);
-      if (inst is LifecycleAware) {
-        return Instance(inst,
-            init: Future.value(inst.onLifecycleEvent(LifecycleEvent.start)));
-      } else {
-        return Instance(inst);
+      if (object != null) {
+        return object;
       }
-    }
 
-    return null;
+      if (instanceBuilder != null) {
+        final inst = instanceBuilder(container);
+        if (inst is LifecycleAware) {
+          return Instance(inst,
+              init: Future.value(inst.onLifecycleEvent(LifecycleEvent.start)));
+        } else {
+          return Instance(inst);
+        }
+      }
+
+      return null;
+    } catch (e, stack) {
+      _log.severe("Error constructing", e, stack);
+      rethrow;
+    }
   }
 
   @override

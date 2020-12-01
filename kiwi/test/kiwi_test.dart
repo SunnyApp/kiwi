@@ -77,8 +77,10 @@ void main() {
 
     test('builders should be resolved', () {
       container.registerSingleton((c) => 5);
-      container.registerFactory((c) => const Sith('Anakin', 'Skywalker', 'DartVader'));
-      container.registerFactory<Character, Sith>((c) => const Character('Anakin', 'Skywalker'));
+      container.registerFactory(
+          (c) => const Sith('Anakin', 'Skywalker', 'DartVader'));
+      container.registerFactory<Character, Sith>(
+          (c) => const Character('Anakin', 'Skywalker'));
 
       expect(container<int>(), 5);
       expect(container<Sith>(), const Sith('Anakin', 'Skywalker', 'DartVader'));
@@ -93,8 +95,10 @@ void main() {
 
     test('one time builders should be resolved', () {
       container.registerSingleton((c) => 5);
-      container.registerSingleton((c) => const Sith('Anakin', 'Skywalker', 'DartVader'));
-      container.registerSingleton<Character, Sith>((c) => const Character('Anakin', 'Skywalker'));
+      container.registerSingleton(
+          (c) => const Sith('Anakin', 'Skywalker', 'DartVader'));
+      container.registerSingleton<Character, Sith>(
+          (c) => const Character('Anakin', 'Skywalker'));
 
       expect(container<int>(), 5);
       expect(container<Sith>(), const Sith('Anakin', 'Skywalker', 'DartVader'));
@@ -117,7 +121,7 @@ void main() {
       container.unregister<int>();
       expect(container<int>(), null);
 
-      container.unregister<int>('named');
+      container.unregister<int>(name: 'named');
       expect(container<int>('named'), null);
     });
   });
@@ -162,7 +166,7 @@ void main() {
           )));
 
       expect(
-          () => container.unregister<int>('name'),
+          () => container.unregister<int>(name: 'name'),
           throwsA(TypeMatcher<AssertionError>().having(
             (f) => f.message,
             'message',
