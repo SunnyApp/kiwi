@@ -1,16 +1,15 @@
 name: sunny_kiwi
-description: A fork of the simple yet efficient IoC container for Dart and Flutter (can be coupled with the kiwi_generator package).
-version: 0.3.0-nullsafety.0
 author: Romain Rastel <lets4r@gmail.com>
+version: 0.3.0-nullsafety.1
 homepage: https://github.com/letsar/kiwi
-
-dependencies:
+description: A fork of the simple yet efficient IoC container for Dart and Flutter (can be coupled with the kiwi_generator package).
+environment: 
+  sdk: '>=2.12.0 <3.0.0'
+dependencies: 
   logging: ^1.0.0
+  meta: ^1.3.0
+  matcher: ^0.12.10
   uuid: ^3.0.1
   collection: ^1.15.0-nullsafety.4
-
-environment:
-  sdk: '>=2.12.0 <3.0.0'
-
-dev_dependencies:
+dev_dependencies: 
   test: ^1.16.8
