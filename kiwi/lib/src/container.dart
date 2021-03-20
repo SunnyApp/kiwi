@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:collection/collection.dart' show IterableExtension;
 import 'package:logging/logging.dart';
 import 'package:meta/meta.dart';
 import 'package:uuid/uuid.dart';
@@ -7,28 +8,28 @@ import 'package:uuid/uuid.dart';
 final _log = Logger("factory");
 
 /// Signature for a builder which creates an object of type [T].
-typedef Factory<T> = T Function(Container container);
+typedef Factory<T> = T? Function(Container container);
 
 /// A simple service container.
 class Container {
   Logger log;
 
   /// Creates a scoped container.
-  Container.scoped([String debugName])
-      : _namedProviders = <String, Map<String, _Provider>>{},
+  Container.scoped([String? debugName])
+      : _namedProviders = <String?, Map<String, _Provider>>{},
         log = Logger(debugName ?? "kiwi");
 
   static final Container _instance = Container.scoped();
 
   /// Always returns a singleton representing the only container to be alive.
-  factory Container({String debugName}) {
+  factory Container({String? debugName}) {
     if (debugName != null) {
       _instance.log = Logger(debugName);
     }
     return _instance;
   }
 
-  final Map<String, Map<String, _Provider>> _namedProviders;
+  final Map<String?, Map<String, _Provider>> _namedProviders;
 
   final List<String> _loadingStack = <String>[];
 
@@ -55,10 +56,10 @@ class Container {
   /// If [name] is set, the instance will be registered under this name.
   /// To retrieve the same instance, the same name should be provided
   /// to [Container.resolve].
-  void registerInstance<S, T extends S>(
+  void registerInstance<S, T extends S?>(
     T instance, {
-    String name,
-    bool isSilent,
+    String? name,
+    bool? isSilent,
   }) {
     Type registeredType = S;
     if (registeredType == dynamic) registeredType = T;
@@ -82,8 +83,8 @@ class Container {
   /// to [Container.resolve].
   void registerFactory<S, T extends S>(
     Factory<S> factory, {
-    String name,
-    bool isSilent,
+    String? name,
+    bool? isSilent,
   }) {
     Type registeredType = S;
     if (registeredType == dynamic) registeredType = T;
@@ -106,9 +107,9 @@ class Container {
   /// to [Container.resolve].
   void registerSingleton<S, T extends S>(
     Factory<S> factory, {
-    String name,
+    String? name,
     bool eagerInit = false,
-    bool isSilent,
+    bool? isSilent,
   }) {
     if (S == dynamic || T == dynamic) {
       throw 'Invalid registration.  The type variables S and T cannot be dynamic, but '
@@ -125,7 +126,7 @@ class Container {
   /// Removes the entry previously registered for the type [T].
   ///
   /// If [name] is set, removes the one registered for that name.
-  Future unregister<T>({String name, bool isSilent}) async {
+  Future unregister<T>({String? name, bool? isSilent}) async {
     isSilent ??= silent;
     final typeName = '$T';
     assert(isSilent || (_namedProviders[name]?.containsKey(typeName) ?? false),
@@ -134,7 +135,7 @@ class Container {
     if (namedProvider != null) {
       final provider = namedProvider[typeName];
       if (provider?.object?.value is LifecycleAware) {
-        await (provider.object?.value as LifecycleAware)
+        await (provider!.object?.value as LifecycleAware)
             .onLifecycleEvent(LifecycleEvent.stop);
         log.fine('Unregister: non-existant $name ($typeName)');
       } else {
@@ -146,8 +147,8 @@ class Container {
     }
   }
 
-  Instance instance<T>({
-    String name,
+  Instance? instance<T>({
+    String? name,
 
     /// Will look for any already created instances that implement the provided type
     bool autoRegister = false,
@@ -161,16 +162,16 @@ class Container {
     return resolved;
   }
 
-  Instance tryInstance<T>(
-      {String name,
+  Instance? tryInstance<T>(
+      {String? name,
 
       /// Will look for any already created instances that implement the provided type
       bool autoRegister = false}) {
     final typeName = '$T';
     // ignore: omit_local_variable_types
-    Map<String, _Provider> providers = _namedProviders[name];
+    Map<String, _Provider>? providers = _namedProviders[name];
     if (!(providers?.containsKey(typeName) ?? false)) {
-      T res;
+      T? res;
       if (autoRegister) {
         res = searchForImplementation<T>(name);
       }
@@ -193,22 +194,22 @@ class Container {
 
   /// Searches existing instances that have been previously registered to find
   /// one that implements [T]
-  T searchForImplementation<T>([String name]) {
+  T? searchForImplementation<T>([String? name]) {
     if (!silent) {
       log.fine(
           "Doing a type-based lookup for type $T because no registered implementation.  "
           "To speed this up, you should register this entity manually at startup");
     }
-    final provider = _namedProviders.values.expand((e) => e.values).firstWhere(
-        (provider) => provider.object?.value is T,
-        orElse: () => null);
+    final provider = _namedProviders.values
+        .expand((e) => e.values)
+        .firstWhereOrNull((provider) => provider.object?.value is T);
 
     if (provider != null) {
       /// register this instance against the prior type
-      var found = provider.object.value as T;
+      var found = provider.object!.value as T?;
       log.info(
           "Found unregistered match of ${found.runtimeType} for requested $T");
-      registerInstance<T, T>(found);
+      registerInstance<T, T?>(found);
       return found;
     }
 
@@ -225,17 +226,17 @@ class Container {
   ///
   ///  * [Container.registerFactory] for register a builder function.
   ///  * [Container.registerInstance] for register an instance.
-  T call<T>([String name]) => resolve<T>(name: name);
+  T? call<T>([String? name]) => resolve<T>(name: name);
 
-  T resolve<T>({String name, bool autoRegister = false}) {
+  T? resolve<T>({String? name, bool autoRegister = false}) {
     if ("$T" == "$dynamic") {
       throw 'Cannot request type dynamic';
     }
     final result = instance<T>(name: name, autoRegister: autoRegister)?.value;
     if (result != null && result is! T) {
-      throw "Invalid container result.  Expected $T but got ${result.runtimeType ?? 'null'}";
+      throw "Invalid container result.  Expected $T but got ${result.runtimeType}";
     }
-    return result as T;
+    return result as T?;
   }
 
   /// Initializes any singletons that are flagged [eagerInit]=true, so you don't have to manually instantiate them.
@@ -273,7 +274,7 @@ class Container {
                   provider.eagerInit == true && provider.object == null)
               .map((provider) async {
             try {
-              final instance = provider.get(this);
+              final instance = provider.get(this)!;
               log.fine(
                   "\t - Initializing eager singleton: ${provider.type}, lifecycle: ${instance.value is LifecycleAware}");
               return await instance.ready.timeout(Duration(seconds: 10));
@@ -340,12 +341,12 @@ class Container {
     _state = ContainerState.Building;
   }
 
-  void _setProvider(String name, _Provider provider, {bool isSilent}) {
+  void _setProvider(String? name, _Provider provider, {bool? isSilent}) {
     isSilent ??= silent;
     assert(
       isSilent ||
           (!_namedProviders.containsKey(name) ||
-              !_namedProviders[name].containsKey(provider.type)),
+              !_namedProviders[name]!.containsKey(provider.type)),
       _assertRegisterMessage('already', name, provider.type),
     );
 
@@ -353,7 +354,7 @@ class Container {
         name, () => <String, _Provider>{})[provider.type] = provider;
   }
 
-  String _assertRegisterMessage(String word, String name, String type) {
+  String _assertRegisterMessage(String word, String? name, String type) {
     return 'The type $type was $word registered${name == null ? '' : ' for the name $name'} => loading stack: $_loadingStack';
   }
 }
@@ -363,35 +364,31 @@ T invalidProvider<T>(String message) {
 }
 
 class _Provider {
-  _Provider.instance(this.object, this.type)
-      : assert(object != null),
-        assert(type != null),
-        instanceBuilder = null,
+  _Provider.instance(Instance this.object, this.type)
+      : instanceBuilder = null,
         eagerInit = false,
         _oneTime = false;
 
   _Provider.factory(this.instanceBuilder, this.type)
-      : assert(type != null),
-        eagerInit = false,
+      : eagerInit = false,
         _oneTime = false;
 
   _Provider.singleton(this.instanceBuilder,
-      {@required this.type, this.eagerInit = false})
-      : assert(type != null),
-        _oneTime = true;
+      {required this.type, this.eagerInit = false})
+      : _oneTime = true;
 
   final String type;
-  final Factory instanceBuilder;
-  Instance object;
+  final Factory? instanceBuilder;
+  Instance? object;
   bool _oneTime = false;
 
   /// Only applies to singletons
   final bool eagerInit;
 
-  Instance get(Container container) {
+  Instance? get(Container container) {
     try {
       if (_oneTime && instanceBuilder != null) {
-        final inst = instanceBuilder(container);
+        final inst = instanceBuilder!(container);
         if (inst is LifecycleAware) {
           object = Instance(inst,
               init:
@@ -407,7 +404,7 @@ class _Provider {
       }
 
       if (instanceBuilder != null) {
-        final inst = instanceBuilder(container);
+        final inst = instanceBuilder!(container);
         if (inst is LifecycleAware) {
           return Instance(inst,
               init: Future.value(inst.onLifecycleEvent(LifecycleEvent.start)));
@@ -439,10 +436,10 @@ class _Provider {
 }
 
 class Instance {
-  final Object value;
+  final Object? value;
   final Completer _completer;
 
-  Instance(this.value, {Future init}) : _completer = Completer() {
+  Instance(this.value, {Future? init}) : _completer = Completer() {
     if (init == null) {
       if (!_completer.isCompleted) {
         _completer.complete(value);
@@ -471,7 +468,7 @@ typedef LifecycleCallback<T> = FutureOr<T> Function();
 mixin LifecycleAwareMixin implements LifecycleAware {
   Logger get log;
 
-  String _instanceId;
+  String? _instanceId;
 
   @override
   String get instanceId => _instanceId ??= Uuid().v4();
@@ -486,7 +483,7 @@ mixin LifecycleAwareMixin implements LifecycleAware {
   final _onInit = <String, LifecycleCallback>{};
   final _onDestroy = <String, LifecycleCallback>{};
 
-  void onInit(String name, LifecycleCallback init, {Duration wait}) {
+  void onInit(String name, LifecycleCallback init, {Duration? wait}) {
     if (_onInit.containsKey(name)) {
       throw "Initializer $name already exists for $runtimeType";
     }
@@ -500,7 +497,7 @@ mixin LifecycleAwareMixin implements LifecycleAware {
     }
   }
 
-  void onDestroy(String name, LifecycleCallback destroy, {Duration wait}) {
+  void onDestroy(String name, LifecycleCallback destroy, {Duration? wait}) {
     if (_onDestroy.containsKey(name)) {
       throw "Initializer $name already exists for $runtimeType";
     }

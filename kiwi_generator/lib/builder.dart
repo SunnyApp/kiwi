@@ -12,7 +12,7 @@ import 'package:source_gen/source_gen.dart';
 
 import 'src/injector_generator.dart';
 
-Builder buildKiwi([BuilderOptions options]) {
+Builder buildKiwi([BuilderOptions? options]) {
   return SharedPartBuilder(const [
     const InjectorGenerator(),
   ], 'kiwi');

@@ -8,9 +8,14 @@ environment:
   sdk: '>=2.0.0 <3.0.0'
 
 dependencies:
-  kiwi: ^0.1.0
+  sunny_kiwi: ^1.0.1-nullsafety.0
 
+dependency_overrides:
+  sunny_kiwi:
+    path: ../kiwi
+  sunny_kiwi_generator:
+    path: ../kiwi_generator
 dev_dependencies:
-  test: ^1.0.0
-  build_runner: ^0.10.1
-  kiwi_generator: ^0.1.1
+  test: ^1.16.8
+  build_runner: ^1.12.2
+  kiwi_generator: ^2.1.1

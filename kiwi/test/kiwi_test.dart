@@ -1,4 +1,4 @@
-import 'package:kiwi/kiwi.dart';
+import 'package:sunny_kiwi/sunny_kiwi.dart';
 import 'package:matcher/matcher.dart';
 import 'package:test/test.dart';
 

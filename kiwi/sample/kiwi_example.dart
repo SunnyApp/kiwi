@@ -1,4 +1,4 @@
-import 'package:kiwi/kiwi.dart';
+import 'package:sunny_kiwi/sunny_kiwi.dart';
 
 void main() {
   Container container = Container();
@@ -11,7 +11,7 @@ class Service {}
 
 class ServiceA extends Service {
   // ignore: avoid_unused_constructor_parameters
-  ServiceA(Logger logger);
+  ServiceA(Logger? logger);
 }
 
 class Logger {}
