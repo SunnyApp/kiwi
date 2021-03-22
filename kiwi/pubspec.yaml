@@ -1,6 +1,6 @@
 name: sunny_kiwi
 author: Romain Rastel <lets4r@gmail.com>
-version: 0.3.0
+version: 0.3.0+1
 homepage: https://github.com/letsar/kiwi
 description: A fork of the simple yet efficient IoC container for Dart and Flutter (can be coupled with the kiwi_generator package).
 environment: 

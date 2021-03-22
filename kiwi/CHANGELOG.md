@@ -1,3 +1,6 @@
+## [0.3.0+1]
+ * Minor bump
+
 ## [0.3.0-nullsafety.1]
  * Added fastlane
 Update to null-safety
